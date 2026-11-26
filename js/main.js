@@ -5,7 +5,7 @@ import { Sound } from './audio.js';
 
 // ───────────── Datos del evento ─────────────
 const EVENT = new Date(2026, 11, 19, 0, 0, 0); // Sábado 19 de diciembre de 2026
-const GOAL = 10; // florecitas para pintar el arcoíris
+const GOAL = 10; // florecitas que lanza el Solcito para pintar el arcoíris
 
 const $ = (s) => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -15,30 +15,27 @@ const TAU = Math.PI * 2;
 const bg = $('#bg'), fx = $('#fx');
 const bctx = bg.getContext('2d'), fctx = fx.getContext('2d');
 const el = {
-  title: $('#title'), hud: $('#hud'), hudN: $('#hudN'), mission: $('#mission'), hint: $('#hint'),
-  toast: $('#toast'), skip: $('#btnSkip'), mute: $('#btnMute'), invite: $('#invite'), card: $('#card'),
+  title: $('#title'), toast: $('#toast'), mute: $('#btnMute'), invite: $('#invite'), card: $('#card'),
   sunTop: $('#sunTop'), osita: $('#osita'), countdown: $('#countdown'), today: $('#today'),
   cd: [$('#cdD'), $('#cdH'), $('#cdM'), $('#cdS')],
 };
-$('#hudGoal').textContent = GOAL;
 
 const sound = new Sound();
 
 let W = 0, H = 0, K = 1, U = 1, S = null;
 let scene = 'title', sceneT = 0, T = 0;
 let dawnA = 1;
-let collected = 0;
+let launched = 0;
 let fxDirty = false;
 let winDone = false;
 
-const clouds = [], stars = [], balloons = [], flowers = [], comets = [], drift = [], parts = [];
+const clouds = [], stars = [], balloons = [], comets = [], drift = [], parts = [];
 const rb = { cx: 0, cy: 0, R: 0, shown: 0, target: 0, ghost: 0, alpha: 1 };
 const sun = {
   x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0, r: 10, rT: 10, rot: 0, spin: 0, tilt: 0,
   sq: 0, sqV: 0, mood: 'sleep', happy: 0, blink: 0, blinkT: 2, alpha: 1, trail: 0, placed: false,
 };
-const ptr = { x: 0, y: 0, down: false, touch: false, t: -99 };
-const timers = { flower: 0, balloon: 1.5, zz: 0.6, drift: 0, cd: 0 };
+const timers = { launch: 0, balloon: 1.5, zz: 0.6, drift: 0, cd: 0 };
 
 // Mascotas de la tarjeta (lienzos pequeños que viajan con el scroll)
 const top = { ctx: el.sunTop.getContext("2d"), happy: 0, spin: 0, spinAcc: 0, blink: 0, blinkT: 2.5, pop: 0 };
@@ -78,7 +75,7 @@ function resize() {
   if (!sun.placed) {
     sun.x = W / 2; sun.y = H * 0.47; sun.r = sun.rT = U * 17; sun.placed = true;
   } else {
-    sun.rT = scene === 'title' || scene === 'waking' ? U * 17 : U * 10.5;
+    sun.rT = scene === 'title' || scene === 'waking' ? U * 17 : U * 11;
   }
 
   for (const [cv, w, h] of [[el.sunTop, 190, 190], [el.osita, 150, 206]]) {
@@ -172,9 +169,9 @@ function updateParts(dt) {
 
 // ───────────── Interfaz ─────────────
 let toastTimer = 0;
-function toast(text, small = false) {
+function toast(text) {
   el.toast.textContent = text;
-  el.toast.className = small ? 'small' : '';
+  el.toast.classList.remove('show');
   void el.toast.offsetWidth;
   el.toast.classList.add('show');
   clearTimeout(toastTimer);
@@ -183,13 +180,6 @@ function toast(text, small = false) {
 
 function buzz(ms) {
   if (navigator.vibrate) { try { navigator.vibrate(ms); } catch { /* nada */ } }
-}
-
-function setHud() {
-  el.hudN.textContent = collected;
-  el.hud.classList.remove('bump');
-  void el.hud.offsetWidth;
-  el.hud.classList.add('bump');
 }
 
 // ───────────── Escenas ─────────────
@@ -207,37 +197,24 @@ function wake() {
   sun.spin = 5;
   sparkle(sun.x, sun.y, 16, 2.4);
   burst(sun.x, sun.y, 14);
-  el.skip.hidden = false;
 }
 
-function startPlay() {
-  scene = 'play';
+// El Solcito, ya despierto, sube y pinta el arcoíris él solito lanzando florecitas.
+function startShow() {
+  scene = 'show';
   sceneT = 0;
-  collected = 0;
+  launched = 0;
   winDone = false;
   rb.shown = rb.target = 0;
   rb.alpha = 1;
-  flowers.length = 0;
   comets.length = 0;
   drift.length = 0;
-  timers.flower = 0.5;
+  timers.launch = 0.55;
   sun.mood = 'awake';
   sun.alpha = 1;
-  sun.rT = U * 10.5;
-  ptr.t = -99;
+  sun.rT = U * 11;
   el.title.hidden = true;
-  el.hud.hidden = false;
-  el.hudN.textContent = '0';
-  el.skip.hidden = false;
-  el.mission.hidden = false;
-  el.mission.classList.remove('out');
-  el.hint.hidden = false;
-  el.hint.classList.remove('out');
   sound.startMusic();
-}
-
-function hideGuides() {
-  el.hint.classList.add('out');
 }
 
 function win() {
@@ -246,11 +223,7 @@ function win() {
   sun.mood = 'happy';
   sun.spin = 9;
   sun.sqV = 6;
-  el.hud.hidden = true;
-  el.skip.hidden = true;
-  el.mission.classList.add('out');
-  el.hint.classList.add('out');
-  toast('¡Lo lograste!');
+  toast('¡Te invitamos!');
   sound.win();
   buzz([20, 60, 30]);
   confetti(rb.cx, rb.cy - rb.R * 0.5, 50, -Math.PI / 2, 1.3, 1.1);
@@ -262,11 +235,6 @@ function showInvite(fast) {
   sceneT = 0;
   document.body.classList.remove('dawn');
   el.title.hidden = true;
-  el.hud.hidden = true;
-  el.skip.hidden = true;
-  el.mission.hidden = true;
-  el.hint.hidden = true;
-  flowers.length = 0;
   comets.length = 0;
   timers.balloon = 0.3;
   timers.drift = 0.2;
@@ -311,8 +279,7 @@ function replay() {
   sun.y = H * 0.45;
   sun.vx = sun.vy = 0;
   sun.sqV = 6;
-  startPlay();
-  el.title.hidden = true;
+  startShow();
 }
 
 // ───────────── Actualización ─────────────
@@ -323,33 +290,9 @@ function updateSun(dt) {
     s.tx = W / 2;
     s.ty = H * 0.47 + Math.sin(T * 1.3) * U * 1.6;
     k = 30;
-  } else if (scene === 'play') {
-    const manual = ptr.down || T - ptr.t < 2.4;
-    if (manual) {
-      s.tx = ptr.x;
-      s.ty = ptr.y - (ptr.touch ? s.r * 1.55 : 0);
-      k = 150;
-    } else if (sceneT > 3.8 || collected > 0) {
-      // piloto automático: si nadie toca, el Solcito juega solo
-      let best = null, bd = 1e9;
-      for (const f of flowers) {
-        if (f.got || f.y > H - S.hillH * 0.9 || f.y < 0) continue;
-        const d = Math.hypot(f.x - s.x, f.y - s.y);
-        if (d < bd) { bd = d; best = f; }
-      }
-      if (best) { s.tx = best.x; s.ty = best.y + best.vy * 0.3; }
-      else { s.tx = W / 2 + Math.sin(T * 0.8) * W * 0.22; s.ty = H * 0.4 + Math.sin(T * 1.3) * H * 0.05; }
-      k = 22;
-    } else {
-      s.tx = W / 2 + Math.sin(T * 1.1) * W * 0.06;
-      s.ty = H * 0.45 + Math.sin(T * 1.6) * U * 2;
-      k = 30;
-    }
-    s.tx = clamp(s.tx, s.r * 0.9, W - s.r * 0.9);
-    s.ty = clamp(s.ty, s.r + 50, H - S.hillH * 0.55);
-  } else if (scene === 'win') {
+  } else if (scene === 'show' || scene === 'win') {
     s.tx = rb.cx;
-    s.ty = rb.cy - rb.R - s.r * 1.9 + Math.sin(T * 5) * U;
+    s.ty = rb.cy - rb.R - s.r * 1.9 + Math.sin(T * (scene === 'win' ? 5 : 2.2)) * U;
     k = 40;
   } else {
     s.ty = -s.r * 3;
@@ -368,13 +311,13 @@ function updateSun(dt) {
   s.tilt += (tiltT - s.tilt) * (1 - Math.exp(-dt * 10));
   s.sqV += (-s.sq * 220 - s.sqV * 13) * dt;
   s.sq += s.sqV * dt;
-  if (s.happy > 0) { s.happy -= dt; if (s.happy <= 0 && scene === 'play') s.mood = 'awake'; }
+  if (s.happy > 0) { s.happy -= dt; if (s.happy <= 0 && scene === 'show') s.mood = 'awake'; }
   s.blinkT -= dt;
   if (s.blinkT < 0) { s.blink = 1; if (s.blinkT < -0.13) { s.blink = 0; s.blinkT = rand(1.8, 4.2); } }
   const aT = scene === 'invite' ? 0 : 1;
   s.alpha += (aT - s.alpha) * (1 - Math.exp(-dt * 7));
 
-  if (scene === 'play' || scene === 'win') {
+  if (scene === 'show' || scene === 'win') {
     s.trail += Math.hypot(s.vx, s.vy) * dt;
     if (s.trail > U * 9) {
       s.trail = 0;
@@ -393,73 +336,40 @@ function tipOf(n) {
   return [rb.cx + Math.cos(a) * r, rb.cy + Math.sin(a) * r];
 }
 
-function collect(f) {
-  f.got = true;
-  const n = collected;
-  collected++;
-  setHud();
+function launchFlower() {
+  const n = launched++;
+  const k = n % S.flowers.length;
   sound.chime(n);
-  buzz(12);
   sun.mood = 'happy';
-  sun.happy = 0.55;
-  sun.sqV = 5.5;
-  sun.spin = Math.max(sun.spin, 2.5);
-  burst(f.x, f.y, 10, f.k);
-  sparkle(f.x, f.y, 5);
-  if (n % 3 === 0) hearts(f.x, f.y, 1);
+  sun.happy = 0.5;
+  sun.sqV = 4.5;
+  sun.spin = Math.max(sun.spin, 2.2);
+  sparkle(sun.x, sun.y, 4, 1.6);
+  if (n % 3 === 0) hearts(sun.x, sun.y - sun.r, 1);
   const [tx, ty] = tipOf(n);
-  comets.push({ k: f.k, x0: f.x, y0: f.y, x1: tx, y1: ty, cx: (f.x + tx) / 2 + rand(-0.2, 0.2) * W, cy: Math.min(f.y, ty) - H * 0.14, t: 0, n, x: f.x, y: f.y });
-  if (collected === 1) { el.mission.classList.add('out'); hideGuides(); }
-  if (collected === 5) toast('¡Qué bonito!', true);
-  if (collected === 8) toast('¡Ya casi!', true);
+  const side = n & 1 ? 1 : -1;
+  comets.push({
+    k, x0: sun.x, y0: sun.y, x1: tx, y1: ty,
+    cx: sun.x + side * rand(0.25, 0.42) * W, cy: sun.y - rand(0.02, 0.12) * H, t: 0, n, x: sun.x, y: sun.y,
+  });
 }
 
-function updatePlay(dt) {
-  if (sceneT > 7) { el.mission.classList.add('out'); hideGuides(); }
-  timers.flower -= dt;
-  const pending = GOAL - collected;
-  if (timers.flower <= 0 && pending > 0 && flowers.length < 5) {
-    timers.flower = rand(0.6, 0.95);
-    const x0 = rand(0.12, 0.88) * W;
-    flowers.push({
-      k: (Math.random() * S.flowers.length) | 0, x0, x: x0, y: -S.flowerR * 1.6,
-      vy: H / rand(5.4, 7.2), ph: rand(0, TAU), amp: rand(0.02, 0.07) * W,
-      rot: rand(0, TAU), vr: rand(-1.4, 1.4), age: 0, got: false, sc: 1,
-    });
+function updateShow(dt) {
+  timers.launch -= dt;
+  if (timers.launch <= 0 && launched < GOAL) {
+    timers.launch = 0.2;
+    launchFlower();
   }
-  const sr = sun.r;
-  for (let i = flowers.length - 1; i >= 0; i--) {
-    const f = flowers[i];
-    f.age += dt;
-    f.y += f.vy * dt;
-    f.x = f.x0 + Math.sin(f.ph + f.age * 1.5) * f.amp;
-    f.rot += f.vr * dt;
-    const dx = sun.x - f.x, dy = sun.y - f.y, d = Math.hypot(dx, dy);
-    // imán suave: las flores se acercan solitas cuando el Solcito pasa cerca
-    if (d < sr * 3.2 && d > 1) {
-      const pull = (1 - d / (sr * 3.2)) * 520 * U * dt / d;
-      f.x0 += dx * pull * 0.12;
-      f.y += dy * pull * 0.12;
-    }
-    const ground = H - S.hillH * 0.55;
-    if (f.y > ground) f.sc = Math.max(0, 1 - (f.y - ground) / (S.hillH * 0.3));
-    if (d < sr * 1.05 + S.flowerR * 0.8 && collected < GOAL) {
-      collect(f);
-      flowers.splice(i, 1);
-    } else if (f.sc <= 0) {
-      flowers.splice(i, 1);
-    }
-  }
-  // el Solcito revienta globos al pasar
+  // el Solcito revienta los globos que lo tocan
   for (const b of balloons) {
-    if (!b.dead && Math.hypot(b.x - sun.x, b.y - sun.y) < sr + S.balloonR * b.sc * 0.9) popBalloon(b);
+    if (!b.dead && Math.hypot(b.x - sun.x, b.y - sun.y) < sun.r + S.balloonR * b.sc * 0.9) popBalloon(b);
   }
 }
 
 function updateComets(dt) {
   for (let i = comets.length - 1; i >= 0; i--) {
     const c = comets[i];
-    c.t += dt / 0.6;
+    c.t += dt / 0.7;
     const t = Math.min(1, c.t), e = t * t * (3 - 2 * t), m = 1 - e;
     c.x = m * m * c.x0 + 2 * m * e * c.cx + e * e * c.x1;
     c.y = m * m * c.y0 + 2 * m * e * c.cy + e * e * c.y1;
@@ -476,10 +386,10 @@ function updateComets(dt) {
 }
 
 function updateRainbow(dt) {
-  const gT = scene === 'play' || scene === 'win' ? 1 : 0;
+  const gT = scene === 'show' || scene === 'win' ? 1 : 0;
   rb.ghost += (gT - rb.ghost) * (1 - Math.exp(-dt * 3));
   if (rb.shown < rb.target) {
-    rb.shown = Math.min(rb.target, rb.shown + dt * 2.6);
+    rb.shown = Math.min(rb.target, rb.shown + dt * 5);
     if (Math.random() < dt * 30) {
       const band = Math.min(4, Math.floor(rb.shown / 2));
       const f = clamp(rb.shown / 2 - band, 0, 1);
@@ -487,7 +397,7 @@ function updateRainbow(dt) {
       sparkle(rb.cx + Math.cos(a) * r, rb.cy + Math.sin(a) * r, 1, 0.6);
     }
   }
-  if (scene === 'play' && !winDone && collected >= GOAL && rb.shown >= GOAL - 0.001) {
+  if (scene === 'show' && !winDone && launched >= GOAL && rb.shown >= GOAL - 0.001) {
     winDone = true;
     win();
   }
@@ -498,7 +408,7 @@ function updateRainbow(dt) {
 function updateWin() {
   if (sceneT > 0.35 && sceneT < 0.4) confetti(rb.cx - rb.R * 0.8, rb.cy - rb.R * 0.2, 6, -1.1, 0.5, 1.2);
   if (sceneT > 0.55 && sceneT < 0.6) confetti(rb.cx + rb.R * 0.8, rb.cy - rb.R * 0.2, 6, -2.0, 0.5, 1.2);
-  if (sceneT > 1.7) {
+  if (sceneT > 1.35) {
     showInvite(false);
     confetti(W * 0.5, H * 0.3, 40, -Math.PI / 2, 1.5, 0.9);
   }
@@ -525,7 +435,7 @@ function popBalloon(b) {
 
 function updateBalloons(dt) {
   timers.balloon -= dt;
-  const max = scene === 'invite' ? 7 : scene === 'play' ? 2 : 3;
+  const max = scene === 'invite' ? 7 : scene === 'show' ? 2 : 3;
   if (timers.balloon <= 0 && balloons.length < max && scene !== 'win') {
     timers.balloon = scene === 'invite' ? rand(1.1, 2.2) : rand(2.5, 4.5);
     spawnBalloon();
@@ -601,9 +511,9 @@ function update(dt) {
       spawn(S.zz, sun.x + sun.r * 0.95, sun.y - sun.r * 0.9, 7 * U, -11 * U, { rot: -0.2, vr: 0.25, sc: rand(0.7, 1.2), max: 2.4, flut: 3 * U });
     }
   } else if (scene === 'waking') {
-    if (sceneT > 1.05) startPlay();
-  } else if (scene === 'play') {
-    updatePlay(dt);
+    if (sceneT > 1.05) startShow();
+  } else if (scene === 'show') {
+    updateShow(dt);
   } else if (scene === 'win') {
     updateWin();
   } else if (scene === 'invite') {
@@ -672,12 +582,8 @@ function render() {
   }
   blit(c, K, S.hills, 0, H - S.hillH);
 
-  for (const f of flowers) {
-    const pop = Math.min(1, f.age * 4) * f.sc;
-    blit(c, K, S.flowers[f.k], f.x, f.y, f.rot, pop, pop, 1);
-  }
   for (const m of comets) {
-    const sc = 0.75 - 0.4 * Math.min(1, m.t);
+    const sc = Math.min(1, m.t * 5) * (0.85 - 0.45 * Math.min(1, m.t));
     blit(c, K, S.flowers[m.k], m.x, m.y, m.t * 9, sc, sc, 1);
   }
   if (sun.alpha > 0.01) {
@@ -745,19 +651,16 @@ function renderMascots() {
 }
 
 // ───────────── Entrada ─────────────
-function setPtr(e) {
-  ptr.x = e.clientX;
-  ptr.y = e.clientY;
-  ptr.touch = e.pointerType !== 'mouse';
-  ptr.t = T;
+function tapFx(x, y, big) {
+  sparkle(x, y, 6, 1.2);
+  burst(x, y, 5);
+  if (big) { hearts(x, y, 1); sound.tap(); }
 }
 
 window.addEventListener('pointerdown', (e) => {
   sound.unlock();
-  if (scene === 'play') {
-    ptr.down = true;
-    setPtr(e);
-    hideGuides();
+  if (scene === 'show' || scene === 'win') {
+    tapFx(e.clientX, e.clientY, true);
   } else if (scene === 'invite') {
     if (e.target.closest('a, button, #sunTop, #osita')) return;
     const overCard = e.target.closest('.card, .foot');
@@ -769,19 +672,12 @@ window.addEventListener('pointerdown', (e) => {
         }
       }
     }
-    sparkle(e.clientX, e.clientY, 6, 1.2);
-    burst(e.clientX, e.clientY, 5);
-    if (!overCard) { hearts(e.clientX, e.clientY, 1); sound.tap(); }
+    tapFx(e.clientX, e.clientY, !overCard);
   }
-});
-window.addEventListener('pointermove', (e) => {
-  if (scene !== 'play') return;
-  if (e.pointerType === 'mouse' || ptr.down) setPtr(e);
 });
 const release = (e) => {
   sound.unlock();
-  if (ptr.down) { ptr.down = false; ptr.t = T; }
-  if (scene === 'title' && e.type === 'pointerup') wake();
+  if (scene === 'title' && e.type === 'pointerup' && !e.target.closest('#btnMute')) wake();
 };
 window.addEventListener('pointerup', release);
 window.addEventListener('pointercancel', release);
@@ -789,13 +685,6 @@ window.addEventListener('keydown', (e) => {
   if (scene === 'title' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); wake(); }
 });
 $('#btnStart').addEventListener('click', () => { sound.unlock(); wake(); });
-
-el.skip.addEventListener('click', (e) => {
-  e.stopPropagation();
-  if (scene === 'play' || scene === 'waking') showInvite(true);
-});
-el.skip.addEventListener('pointerdown', (e) => e.stopPropagation());
-el.skip.addEventListener('pointerup', (e) => e.stopPropagation());
 
 function syncMute() { el.mute.setAttribute('aria-pressed', sound.muted ? 'true' : 'false'); }
 el.mute.addEventListener('click', (e) => {
@@ -890,8 +779,7 @@ function frame(now) {
 resize();
 requestAnimationFrame(frame);
 
-// Para pruebas: permite saltar directo a una escena con ?escena=invitacion
+// Atajo: ?escena=invitacion abre directo la invitación, sin la animación de entrada
 const q = new URLSearchParams(location.search).get('escena');
 if (q === 'invitacion') showInvite(true);
-if (q === 'juego') { document.body.classList.remove('dawn'); sun.mood = 'awake'; startPlay(); }
-window.__game = { get scene() { return scene; }, get collected() { return collected; }, sun, ptr };
+window.__game = { get scene() { return scene; } };
