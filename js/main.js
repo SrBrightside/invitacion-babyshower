@@ -5,7 +5,7 @@ import { Sound } from './audio.js';
 
 // ───────────── Datos del evento ─────────────
 const EVENT = new Date('2026-12-19T15:00:00-06:00'); // Sábado 19 de diciembre de 2026, 3:00 pm hora de Managua
-const GOAL = 10; // florecitas que lanza el Solcito para pintar el arcoíris
+const GOAL = 10; // florecitas que pintan el arcoíris (en la entrada y en el minijuego)
 
 const $ = (s) => document.querySelector(s);
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -16,6 +16,7 @@ const bg = $('#bg'), fx = $('#fx');
 const bctx = bg.getContext('2d'), fctx = fx.getContext('2d');
 const el = {
   title: $('#title'), toast: $('#toast'), mute: $('#btnMute'), invite: $('#invite'), card: $('#card'),
+  hud: $('#hud'), hudN: $('#hudN'), mission: $('#mission'), hint: $('#hint'), exit: $('#btnExit'),
   sunTop: $('#sunTop'), osita: $('#osita'), countdown: $('#countdown'), today: $('#today'),
   cd: [$('#cdD'), $('#cdH'), $('#cdM'), $('#cdS')],
 };
@@ -25,17 +26,20 @@ const sound = new Sound();
 let W = 0, H = 0, K = 1, U = 1, S = null;
 let scene = 'title', sceneT = 0, T = 0;
 let dawnA = 1;
-let launched = 0;
+let launched = 0; // florecitas lanzadas en la animación de entrada
+let collected = 0; // florecitas juntadas en el minijuego
+let fromGame = false;
 let fxDirty = false;
 let winDone = false;
 
-const clouds = [], stars = [], balloons = [], comets = [], drift = [], parts = [];
+const clouds = [], stars = [], balloons = [], flowers = [], comets = [], drift = [], parts = [];
 const rb = { cx: 0, cy: 0, R: 0, shown: 0, target: 0, ghost: 0, alpha: 1 };
 const sun = {
   x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0, r: 10, rT: 10, rot: 0, spin: 0, tilt: 0,
   sq: 0, sqV: 0, mood: 'sleep', happy: 0, blink: 0, blinkT: 2, alpha: 1, trail: 0, placed: false,
 };
-const timers = { launch: 0, balloon: 1.5, zz: 0.6, drift: 0, cd: 0 };
+const ptr = { x: 0, y: 0, down: false, touch: false, t: -99 };
+const timers = { launch: 0, flower: 0, balloon: 1.5, zz: 0.6, drift: 0, cd: 0 };
 
 // Mascotas de la tarjeta (lienzos pequeños que viajan con el scroll)
 const top = { ctx: el.sunTop.getContext("2d"), happy: 0, spin: 0, spinAcc: 0, blink: 0, blinkT: 2.5, pop: 0 };
@@ -214,16 +218,51 @@ function startShow() {
   sun.alpha = 1;
   sun.rT = U * 11;
   el.title.hidden = true;
-  sound.startMusic();
+}
+
+// Minijuego opcional: el Solcito sigue el dedo y junta las florecitas que caen.
+function startGame() {
+  el.invite.hidden = true;
+  el.invite.classList.remove('in', 'fast');
+  balloons.length = 0;
+  scene = 'play';
+  sceneT = 0;
+  collected = 0;
+  winDone = false;
+  rb.shown = rb.target = 0;
+  rb.alpha = 1;
+  flowers.length = 0;
+  comets.length = 0;
+  drift.length = 0;
+  timers.flower = 0.5;
+  sun.x = W / 2;
+  sun.y = H * 0.45;
+  sun.vx = sun.vy = 0;
+  sun.sqV = 6;
+  sun.mood = 'awake';
+  sun.alpha = 1;
+  sun.rT = U * 10.5;
+  ptr.down = false;
+  ptr.t = -99;
+  el.hudN.textContent = '0';
+  for (const n of [el.hud, el.exit, el.mission, el.hint]) { n.hidden = false; n.classList.remove('out'); }
+}
+
+function hideGameUi() {
+  for (const n of [el.hud, el.exit, el.mission, el.hint]) n.hidden = true;
+  flowers.length = 0;
+  ptr.down = false;
 }
 
 function win() {
+  fromGame = scene === 'play';
+  hideGameUi();
   scene = 'win';
   sceneT = 0;
   sun.mood = 'happy';
   sun.spin = 9;
   sun.sqV = 6;
-  toast('¡Te invitamos!');
+  toast(fromGame ? '¡Lo lograste!' : '¡Te invitamos!');
   sound.win();
   buzz([20, 60, 30]);
   confetti(rb.cx, rb.cy - rb.R * 0.5, 50, -Math.PI / 2, 1.3, 1.1);
@@ -235,6 +274,7 @@ function showInvite(fast) {
   sceneT = 0;
   document.body.classList.remove('dawn');
   el.title.hidden = true;
+  hideGameUi();
   comets.length = 0;
   timers.balloon = 0.3;
   timers.drift = 0.2;
@@ -266,8 +306,6 @@ function showInvite(fast) {
   inv.classList.add('in');
   if (!fromRainbow) inv.classList.add('fast');
   top.pop = 1;
-  sound.unlock();
-  sound.startMusic();
   updateCountdown();
 }
 
@@ -290,6 +328,29 @@ function updateSun(dt) {
     s.tx = W / 2;
     s.ty = H * 0.47 + Math.sin(T * 1.3) * U * 1.6;
     k = 30;
+  } else if (scene === 'play') {
+    if (ptr.down || T - ptr.t < 3) {
+      s.tx = ptr.x;
+      s.ty = ptr.y - (ptr.touch ? s.r * 1.55 : 0);
+      k = 150;
+    } else if (sceneT > 4.5) {
+      // si nadie toca un rato, el Solcito sigue jugando solo
+      let best = null, bd = 1e9;
+      for (const f of flowers) {
+        if (f.y > H - S.hillH * 0.9 || f.y < 0) continue;
+        const d = Math.hypot(f.x - s.x, f.y - s.y);
+        if (d < bd) { bd = d; best = f; }
+      }
+      if (best) { s.tx = best.x; s.ty = best.y + best.vy * 0.3; }
+      else { s.tx = W / 2 + Math.sin(T * 0.8) * W * 0.22; s.ty = H * 0.4 + Math.sin(T * 1.3) * H * 0.05; }
+      k = 22;
+    } else {
+      s.tx = W / 2 + Math.sin(T * 1.1) * W * 0.06;
+      s.ty = H * 0.45 + Math.sin(T * 1.6) * U * 2;
+      k = 30;
+    }
+    s.tx = clamp(s.tx, s.r * 0.9, W - s.r * 0.9);
+    s.ty = clamp(s.ty, s.r + 50, H - S.hillH * 0.55);
   } else if (scene === 'show' || scene === 'win') {
     s.tx = rb.cx;
     s.ty = rb.cy - rb.R - s.r * 1.9 + Math.sin(T * (scene === 'win' ? 5 : 2.2)) * U;
@@ -311,13 +372,13 @@ function updateSun(dt) {
   s.tilt += (tiltT - s.tilt) * (1 - Math.exp(-dt * 10));
   s.sqV += (-s.sq * 220 - s.sqV * 13) * dt;
   s.sq += s.sqV * dt;
-  if (s.happy > 0) { s.happy -= dt; if (s.happy <= 0 && scene === 'show') s.mood = 'awake'; }
+  if (s.happy > 0) { s.happy -= dt; if (s.happy <= 0 && (scene === 'show' || scene === 'play')) s.mood = 'awake'; }
   s.blinkT -= dt;
   if (s.blinkT < 0) { s.blink = 1; if (s.blinkT < -0.13) { s.blink = 0; s.blinkT = rand(1.8, 4.2); } }
   const aT = scene === 'invite' ? 0 : 1;
   s.alpha += (aT - s.alpha) * (1 - Math.exp(-dt * 7));
 
-  if (scene === 'show' || scene === 'win') {
+  if (scene === 'show' || scene === 'play' || scene === 'win') {
     s.trail += Math.hypot(s.vx, s.vy) * dt;
     if (s.trail > U * 9) {
       s.trail = 0;
@@ -334,6 +395,69 @@ function tipOf(n) {
   const r = rb.R - bw * (band + 0.5);
   const a = Math.PI + half * (Math.PI / 2) + 0.12;
   return [rb.cx + Math.cos(a) * r, rb.cy + Math.sin(a) * r];
+}
+
+function collect(f) {
+  const n = collected++;
+  el.hudN.textContent = collected;
+  el.hud.classList.remove('bump');
+  void el.hud.offsetWidth;
+  el.hud.classList.add('bump');
+  sound.chime(n);
+  buzz(12);
+  sun.mood = 'happy';
+  sun.happy = 0.55;
+  sun.sqV = 5.5;
+  sun.spin = Math.max(sun.spin, 2.5);
+  burst(f.x, f.y, 10, f.k);
+  sparkle(f.x, f.y, 5);
+  if (n % 3 === 0) hearts(f.x, f.y, 1);
+  const [tx, ty] = tipOf(n);
+  comets.push({
+    k: f.k, x0: f.x, y0: f.y, x1: tx, y1: ty,
+    cx: (f.x + tx) / 2 + rand(-0.2, 0.2) * W, cy: Math.min(f.y, ty) - H * 0.14, t: 0, n, x: f.x, y: f.y,
+  });
+  if (collected === 1) { el.mission.classList.add('out'); el.hint.classList.add('out'); }
+}
+
+function updateGame(dt) {
+  if (sceneT > 7) { el.mission.classList.add('out'); el.hint.classList.add('out'); }
+  timers.flower -= dt;
+  if (timers.flower <= 0 && collected < GOAL && flowers.length < 5) {
+    timers.flower = rand(0.6, 0.95);
+    const x0 = rand(0.12, 0.88) * W;
+    flowers.push({
+      k: (Math.random() * S.flowers.length) | 0, x0, x: x0, y: -S.flowerR * 1.6,
+      vy: H / rand(5.4, 7.2), ph: rand(0, TAU), amp: rand(0.02, 0.07) * W,
+      rot: rand(0, TAU), vr: rand(-1.4, 1.4), age: 0, sc: 1,
+    });
+  }
+  const sr = sun.r;
+  for (let i = flowers.length - 1; i >= 0; i--) {
+    const f = flowers[i];
+    f.age += dt;
+    f.y += f.vy * dt;
+    f.x = f.x0 + Math.sin(f.ph + f.age * 1.5) * f.amp;
+    f.rot += f.vr * dt;
+    const dx = sun.x - f.x, dy = sun.y - f.y, d = Math.hypot(dx, dy);
+    // imán suave: las flores se acercan solitas cuando el Solcito pasa cerca
+    if (d < sr * 3.2 && d > 1) {
+      const pull = (1 - d / (sr * 3.2)) * 520 * U * dt / d;
+      f.x0 += dx * pull * 0.12;
+      f.y += dy * pull * 0.12;
+    }
+    const ground = H - S.hillH * 0.55;
+    if (f.y > ground) f.sc = Math.max(0, 1 - (f.y - ground) / (S.hillH * 0.3));
+    if (d < sr * 1.05 + S.flowerR * 0.8 && collected < GOAL) {
+      collect(f);
+      flowers.splice(i, 1);
+    } else if (f.sc <= 0) {
+      flowers.splice(i, 1);
+    }
+  }
+  for (const b of balloons) {
+    if (!b.dead && Math.hypot(b.x - sun.x, b.y - sun.y) < sr + S.balloonR * b.sc * 0.9) popBalloon(b);
+  }
 }
 
 function launchFlower() {
@@ -386,7 +510,7 @@ function updateComets(dt) {
 }
 
 function updateRainbow(dt) {
-  const gT = scene === 'show' || scene === 'win' ? 1 : 0;
+  const gT = scene === 'show' || scene === 'play' || scene === 'win' ? 1 : 0;
   rb.ghost += (gT - rb.ghost) * (1 - Math.exp(-dt * 3));
   if (rb.shown < rb.target) {
     rb.shown = Math.min(rb.target, rb.shown + dt * 5);
@@ -397,7 +521,8 @@ function updateRainbow(dt) {
       sparkle(rb.cx + Math.cos(a) * r, rb.cy + Math.sin(a) * r, 1, 0.6);
     }
   }
-  if (scene === 'show' && !winDone && launched >= GOAL && rb.shown >= GOAL - 0.001) {
+  const done = (scene === 'show' && launched >= GOAL) || (scene === 'play' && collected >= GOAL);
+  if (done && !winDone && rb.shown >= GOAL - 0.001) {
     winDone = true;
     win();
   }
@@ -435,7 +560,7 @@ function popBalloon(b) {
 
 function updateBalloons(dt) {
   timers.balloon -= dt;
-  const max = scene === 'invite' ? 7 : scene === 'show' ? 2 : 3;
+  const max = scene === 'invite' ? 7 : scene === 'show' || scene === 'play' ? 2 : 3;
   if (timers.balloon <= 0 && balloons.length < max && scene !== 'win') {
     timers.balloon = scene === 'invite' ? rand(1.1, 2.2) : rand(2.5, 4.5);
     spawnBalloon();
@@ -514,6 +639,8 @@ function update(dt) {
     if (sceneT > 1.05) startShow();
   } else if (scene === 'show') {
     updateShow(dt);
+  } else if (scene === 'play') {
+    updateGame(dt);
   } else if (scene === 'win') {
     updateWin();
   } else if (scene === 'invite') {
@@ -582,6 +709,10 @@ function render() {
   }
   blit(c, K, S.hills, 0, H - S.hillH);
 
+  for (const f of flowers) {
+    const pop = Math.min(1, f.age * 4) * f.sc;
+    blit(c, K, S.flowers[f.k], f.x, f.y, f.rot, pop, pop, 1);
+  }
   for (const m of comets) {
     const sc = Math.min(1, m.t * 5) * (0.85 - 0.45 * Math.min(1, m.t));
     blit(c, K, S.flowers[m.k], m.x, m.y, m.t * 9, sc, sc, 1);
@@ -651,6 +782,13 @@ function renderMascots() {
 }
 
 // ───────────── Entrada ─────────────
+function setPtr(e) {
+  ptr.x = e.clientX;
+  ptr.y = e.clientY;
+  ptr.touch = e.pointerType !== 'mouse';
+  ptr.t = T;
+}
+
 function tapFx(x, y, big) {
   sparkle(x, y, 6, 1.2);
   burst(x, y, 5);
@@ -659,7 +797,12 @@ function tapFx(x, y, big) {
 
 window.addEventListener('pointerdown', (e) => {
   sound.unlock();
-  if (scene === 'show' || scene === 'win') {
+  if (scene === 'play') {
+    if (e.target.closest('button')) return;
+    ptr.down = true;
+    setPtr(e);
+    el.hint.classList.add('out');
+  } else if (scene === 'show' || scene === 'win') {
     tapFx(e.clientX, e.clientY, true);
   } else if (scene === 'invite') {
     if (e.target.closest('a, button, #sunTop, #osita')) return;
@@ -675,8 +818,12 @@ window.addEventListener('pointerdown', (e) => {
     tapFx(e.clientX, e.clientY, !overCard);
   }
 });
+window.addEventListener('pointermove', (e) => {
+  if (scene === 'play' && (e.pointerType === 'mouse' || ptr.down)) setPtr(e);
+});
 const release = (e) => {
   sound.unlock();
+  if (ptr.down) { ptr.down = false; ptr.t = T; }
   if (scene === 'title' && e.type === 'pointerup' && !e.target.closest('#btnMute')) wake();
 };
 window.addEventListener('pointerup', release);
@@ -717,6 +864,12 @@ el.osita.addEventListener('click', () => {
 });
 
 $('#btnReplay').addEventListener('click', replay);
+$('#btnPlay').addEventListener('click', startGame);
+el.exit.addEventListener('click', () => { if (scene === 'play') showInvite(true); });
+// iOS solo deja iniciar audio dentro de ciertos gestos: se intenta en todos.
+for (const ev of ['touchend', 'click', 'keydown']) {
+  window.addEventListener(ev, () => sound.unlock(), { capture: true, passive: true });
+}
 
 const shareBtn = $('#btnShare');
 if (navigator.share) {
@@ -782,4 +935,4 @@ requestAnimationFrame(frame);
 // Atajo: ?escena=invitacion abre directo la invitación, sin la animación de entrada
 const q = new URLSearchParams(location.search).get('escena');
 if (q === 'invitacion') showInvite(true);
-window.__game = { get scene() { return scene; } };
+window.__game = { get scene() { return scene; }, get collected() { return collected; }, sound };

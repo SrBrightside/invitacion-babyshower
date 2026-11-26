@@ -88,6 +88,10 @@
       <div class="foot-side">
         <p class="bubble rv">¡Te esperamos con<br>mucho cariño!</p>
         <div class="foot-links rv">
+          <button type="button" class="chip chip-play" id="btnPlay">
+            <svg viewBox="-12 -12 24 24" width="17" height="17" aria-hidden="true"><g fill="#fff"><circle cx="0" cy="-5.4" r="4.3"/><circle cx="5.1" cy="-1.7" r="4.3"/><circle cx="3.2" cy="4.4" r="4.3"/><circle cx="-3.2" cy="4.4" r="4.3"/><circle cx="-5.1" cy="-1.7" r="4.3"/></g><circle r="3" fill="#FCE191"/></svg>
+            Jugar con el Solcito
+          </button>
           <button type="button" class="chip" id="btnReplay">
             <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M4 12a8 8 0 1 0 2.600-5.900M4 4v4.500h4.500"/></svg>
             Ver de nuevo
@@ -114,6 +118,17 @@
       Toca para abrir tu invitación
     </button>
   </section>
+
+  <div id="hud" hidden>
+    <svg viewBox="-12 -12 24 24" width="24" height="24" aria-hidden="true"><g fill="#F3B4BF" stroke="#fff" stroke-width="1"><circle cx="0" cy="-5.4" r="4.3"/><circle cx="5.1" cy="-1.7" r="4.3"/><circle cx="3.2" cy="4.4" r="4.3"/><circle cx="-3.2" cy="4.4" r="4.3"/><circle cx="-5.1" cy="-1.7" r="4.3"/></g><circle r="3" fill="#FCE191"/></svg>
+    <b id="hudN">0</b><span>/ 10</span>
+  </div>
+
+  <p id="mission" hidden>Desliza el dedo y junta <b>florecitas</b><br>para pintar el arcoíris</p>
+
+  <div id="hint" hidden aria-hidden="true"><span>👆</span></div>
+
+  <button type="button" id="btnExit" class="corner corner-left" hidden>Volver</button>
 
   <div id="toast" aria-live="polite"></div>
 
