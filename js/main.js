@@ -4,7 +4,7 @@ import {
 import { Sound } from './audio.js';
 
 // ───────────── Datos del evento ─────────────
-const EVENT = new Date(2026, 11, 19, 0, 0, 0); // Sábado 19 de diciembre de 2026
+const EVENT = new Date('2026-12-19T15:00:00-06:00'); // Sábado 19 de diciembre de 2026, 3:00 pm hora de Managua
 const GOAL = 10; // florecitas que lanza el Solcito para pintar el arcoíris
 
 const $ = (s) => document.querySelector(s);
@@ -485,7 +485,7 @@ function updateCountdown() {
   const ms = EVENT.getTime() - Date.now();
   if (ms <= 0) {
     el.countdown.hidden = true;
-    el.today.hidden = ms < -864e5;
+    el.today.hidden = ms < -9 * 36e5; // se muestra hasta la medianoche del día del evento
     return;
   }
   const s = Math.floor(ms / 1000);
@@ -724,7 +724,7 @@ if (navigator.share) {
   shareBtn.addEventListener('click', () => {
     navigator.share({
       title: 'Baby Shower de Olivia Victoria',
-      text: '¡Estás invitado al Baby Shower de Olivia Victoria! Sábado 19 de Diciembre.',
+      text: '¡Estás invitado al Baby Shower de Olivia Victoria! Sábado 19 de Diciembre, 3:00 pm.',
       url: location.href,
     }).catch(() => {});
   });
@@ -735,7 +735,7 @@ if (!/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)) {
   const q = new URLSearchParams({
     action: 'TEMPLATE',
     text: 'Baby Shower de Olivia Victoria',
-    dates: '20261219/20261220',
+    dates: '20261219T210000Z/20261220T000000Z', // 3:00 pm a 6:00 pm en Managua (UTC-6)
     location: 'Residencial Sierras Doradas, Casa D-5',
     details: 'Baby Shower de Olivia Victoria Vargas Arce. Cómo llegar: https://maps.app.goo.gl/cN2Evq2ijcGLDnuL6',
   });

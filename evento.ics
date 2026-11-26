@@ -6,12 +6,11 @@ METHOD:PUBLISH
 BEGIN:VEVENT
 UID:babyshower-olivia-victoria-20261219@invitacion
 DTSTAMP:20261126T000000Z
-DTSTART;VALUE=DATE:20261219
-DTEND;VALUE=DATE:20261220
+DTSTART:20261219T210000Z
+DTEND:20261220T000000Z
 SUMMARY:Baby Shower de Olivia Victoria
 LOCATION:Residencial Sierras Doradas\, Casa D-5
 DESCRIPTION:Baby Shower de Olivia Victoria Vargas Arce.\nCómo llegar: https://maps.app.goo.gl/cN2Evq2ijcGLDnuL6
 URL:https://maps.app.goo.gl/cN2Evq2ijcGLDnuL6
-TRANSP:TRANSPARENT
 END:VEVENT
 END:VCALENDAR

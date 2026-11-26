@@ -339,11 +339,24 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
   text-shadow: 0 3px 0 #FBD5DB;
 }
 
+.time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 4px 14px 5px 10px;
+  border-radius: 999px;
+  background: #F3ECFB;
+  font-weight: 700;
+  font-size: clamp(15px, 4.4vw, 17px);
+  letter-spacing: .04em;
+  color: #8E6FC0;
+}
 .countdown {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 7px;
-  margin: 14px auto 0;
+  margin: 10px auto 0;
   max-width: 280px;
 }
 .cd {
@@ -475,7 +488,9 @@ button { font: inherit; color: inherit; border: 0; background: none; padding: 0;
   .card { padding-bottom: 18px; }
   .honor { margin-top: 10px; }
   .divider { margin: 5px 0 6px; }
-  .countdown { margin-top: 10px; }
+  .time { margin-top: 5px; }
+  .countdown { margin-top: 8px; }
+  .cd { padding: 5px 0 5px; }
   .place { margin-top: 12px; }
   .actions { margin-top: 12px; }
 }
